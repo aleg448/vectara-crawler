@@ -72,11 +72,19 @@ def main() -> None:
     """
     logging.info("Starting ingest.py")
 
-    config_name = os.environ['CONFIG_FILE']
-    profile_name = os.environ['PROFILE']
+    config_name = os.environ.get('CONFIG_FILE')
+    profile_name = os.environ.get('PROFILE')
     
     logging.info(f"Config file: {config_name}")
     logging.info(f"Profile name: {profile_name}")
+
+    if not config_name:
+        logging.error("CONFIG_FILE environment variable not set")
+        return
+
+    if not profile_name:
+        logging.error("PROFILE environment variable not set")
+        return
     
     # process arguments 
     cfg: DictConfig = DictConfig(OmegaConf.load(config_name))
@@ -84,9 +92,25 @@ def main() -> None:
     logging.info("Loaded configuration")
 
     # Add environment variables to the configuration
-    cfg.vectara.api_key = os.environ['VECTARA_API_KEY']
-    cfg.vectara.customer_id = os.environ['VECTARA_CUSTOMER_ID']
-    cfg.vectara.corpus_id = int(os.environ['VECTARA_CORPUS_ID'])
+    vectara_api_key = os.environ.get('VECTARA_API_KEY')
+    vectara_customer_id = os.environ.get('VECTARA_CUSTOMER_ID')
+    vectara_corpus_id = os.environ.get('VECTARA_CORPUS_ID')
+
+    if not vectara_api_key:
+        logging.error("VECTARA_API_KEY environment variable not set")
+        return
+
+    if not vectara_customer_id:
+        logging.error("VECTARA_CUSTOMER_ID environment variable not set")
+        return
+
+    if not vectara_corpus_id:
+        logging.error("VECTARA_CORPUS_ID environment variable not set")
+        return
+
+    cfg.vectara.api_key = vectara_api_key
+    cfg.vectara.customer_id = vectara_customer_id
+    cfg.vectara.corpus_id = int(vectara_corpus_id)
 
     logging.info("Updated configuration with environment variables")
 

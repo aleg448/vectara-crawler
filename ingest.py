@@ -3,7 +3,6 @@ import json
 import requests
 import time
 from omegaconf import OmegaConf, DictConfig
-import toml     # type: ignore
 import sys
 import os
 from typing import Any
@@ -63,7 +62,6 @@ def reset_corpus(endpoint: str, customer_id: str, corpus_id: int, auth_url: str,
         logging.info(f"Reset corpus {corpus_id}")
     else:
         logging.error(f"Error resetting corpus: {response.status_code} {response.text}")
-                      
 
 def main() -> None:
     """
@@ -72,61 +70,25 @@ def main() -> None:
     Reads the necessary environment variables and sets up the web crawler
     accordingly. Starts the crawl loop and logs the progress and errors.
     """
-    if len(sys.argv) != 3:
-        logging.info("Usage: python ingest.py <config_file> <secrets-profile>")
-        return
-    config_name = sys.argv[1]
-    profile_name = sys.argv[2]
+    logging.info("Starting ingest.py")
 
+    config_name = os.environ['CONFIG_FILE']
+    profile_name = os.environ['PROFILE']
+    
+    logging.info(f"Config file: {config_name}")
+    logging.info(f"Profile name: {profile_name}")
+    
     # process arguments 
     cfg: DictConfig = DictConfig(OmegaConf.load(config_name))
     
-    # add .env params, by profile
-    volume = '/home/vectara/env'
-    with open(f"{volume}/secrets.toml", 'r') as f:
-        env_dict = toml.load(f)
-    if profile_name not in env_dict:
-        logging.info(f'Profile "{profile_name}" not found in secrets.toml')
-        return
-    
-    # Add all keys from "general" section to the vectara config
-    general_dict = env_dict.get('general', {})
-    for k,v in general_dict.items():
-        OmegaConf.update(cfg, f'vectara.{k.lower()}', v)
+    logging.info("Loaded configuration")
 
-    # Add all supported special secrets from the specified profile to the specific crawler config
-    env_dict = env_dict[profile_name]
-    for k,v in env_dict.items():
-        if k=='HUBSPOT_API_KEY':
-            OmegaConf.update(cfg, f'hubspot_crawler.{k.lower()}', v)
-            continue
-        if k=='NOTION_API_KEY':
-            OmegaConf.update(cfg, f'notion_crawler.{k.lower()}', v)
-            continue
-        if k=='SLACK_USER_TOKEN':
-            OmegaConf.update(cfg, f'slack_crawler.{k.lower()}', v)
-            continue
-        if k=='DISCOURSE_API_KEY':
-            OmegaConf.update(cfg, f'discourse_crawler.{k.lower()}', v)
-            continue
-        if k=='FMP_API_KEY':
-            OmegaConf.update(cfg, f'fmp_crawler.{k.lower()}', v)
-            continue
-        if k=='JIRA_PASSWORD':
-            OmegaConf.update(cfg, f'jira_crawler.{k.lower()}', v)
-            continue
-        if k=='GITHUB_TOKEN':
-            OmegaConf.update(cfg, f'github_crawler.{k.lower()}', v)
-            continue
-        if k=='SYNAPSE_TOKEN':
-            OmegaConf.update(cfg, f'synapse_crawler.{k.lower()}', v)
-            continue
-        if k.startswith('aws_'):
-            OmegaConf.update(cfg, f's3_crawler.{k.lower()}', v)
-            continue
+    # Add environment variables to the configuration
+    cfg.vectara.api_key = os.environ['VECTARA_API_KEY']
+    cfg.vectara.customer_id = os.environ['VECTARA_CUSTOMER_ID']
+    cfg.vectara.corpus_id = int(os.environ['VECTARA_CORPUS_ID'])
 
-        # default (otherwise) - add to vectara config
-        OmegaConf.update(cfg['vectara'], k, v)
+    logging.info("Updated configuration with environment variables")
 
     endpoint = cfg.vectara.get("endpoint", "api.vectara.io")
     customer_id = cfg.vectara.customer_id
@@ -134,8 +96,16 @@ def main() -> None:
     api_key = cfg.vectara.api_key
     crawler_type = cfg.crawling.crawler_type
 
+    logging.info(f"Endpoint: {endpoint}")
+    logging.info(f"Customer ID: {customer_id}")
+    logging.info(f"Corpus ID: {corpus_id}")
+    logging.info(f"API Key: {api_key[:5]}...")  # Log only the first 5 characters of the API key
+    logging.info(f"Crawler Type: {crawler_type}")
+
     # instantiate the crawler
     crawler = instantiate_crawler(Crawler, 'crawlers', f'{crawler_type.capitalize()}Crawler', cfg, endpoint, customer_id, corpus_id, api_key)
+
+    logging.info(f"Instantiated {crawler_type.capitalize()}Crawler")
 
     # When debugging a crawler, it is sometimes useful to reset the corpus (remove all documents)
     # To do that you would have to set this to True and also include <auth_url> and <auth_id> in the secrets.toml file

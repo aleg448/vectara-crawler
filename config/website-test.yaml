@@ -1,0 +1,16 @@
+
+vectara:
+  corpus_id: ${VECTARA_CORPUS_ID}
+  customer_id: ${VECTARA_CUSTOMER_ID}
+  reindex: true
+
+crawling:
+  crawler_type: website
+
+website_crawler:
+  urls: ["https://vectara.com"]
+  delay: 1
+  pages_source: sitemap
+  pos_regex: [".*"]
+  extraction: playwright
+  ray_workers: 0

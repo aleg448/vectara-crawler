@@ -87,7 +87,7 @@ def main() -> None:
         return
     
     # process arguments 
-    cfg: DictConfig = DictConfig(OmegaConf.load('/home/vectara/app/' + config_name))
+    cfg: DictConfig = DictConfig(OmegaConf.load(config_name))
     
     logging.info("Loaded configuration")
 

@@ -17,7 +17,7 @@ import docutils.core
 from core.utils import html_to_text, detect_language, get_file_size_in_MB, create_session_with_retries, TableSummarizer, mask_pii
 from core.extract import get_content_and_title
 
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 
 from unstructured.partition.auto import partition
 import unstructured as us
@@ -30,19 +30,19 @@ get_headers = {
     "Connection": "keep-alive",
 }
 
-def _parse_local_file(filename: str, summarize_tables: bool, openai_api_key: str = None) -> Tuple[str, List[str]]:
+async def _parse_local_file(filename: str, summarize_tables: bool, openai_api_key: str = None) -> Tuple[str, List[str]]:
     st = time.time()
 
     if filename.endswith(".pdf") and summarize_tables and openai_api_key is not None:
         try:
             from unstructured.partition.auto import partition_pdf
-            elements = partition_pdf(filename, infer_table_structure=True, extract_images_in_pdf=False,
+            elements = await partition_pdf(filename, infer_table_structure=True, extract_images_in_pdf=False,
                                         strategy='hi_res', hi_res_model_name='yolox')  # use 'detectron2_onnx' for a faster model
         except ImportError:
             logging.error("Failed to import unstructured.partition.auto.partition_pdf")
-            elements = partition(filename)
+            elements = await partition(filename)
     else:
-        elements = partition(filename)
+        elements = await partition(filename)
 
     # get title
     titles = [str(x) for x in elements if type(x)==us.documents.elements.Title and len(str(x))>10]
@@ -53,7 +53,7 @@ def _parse_local_file(filename: str, summarize_tables: bool, openai_api_key: str
     texts = []
     for t in elements:
         if type(t)==us.documents.elements.Table and summarize_tables and openai_api_key is not None:
-            texts.append(summarizer.summarize_table_text(str(t)))
+            texts.append(await summarizer.summarize_table_text(str(t)))
         else:
             texts.append(str(t))
 
@@ -95,35 +95,34 @@ class Indexer(object):
             return mask_pii(text)
         return text
 
-    def url_triggers_download(self, url: str) -> bool:
+    async def url_triggers_download(self, url: str) -> bool:
         download_triggered = False
         try:
-            p = sync_playwright().start()
-            browser = p.firefox.launch(headless=True)
-            context = browser.new_context()
+            async with async_playwright() as p:
+                browser = await p.firefox.launch(headless=True)
+                context = await browser.new_context()
 
-            # Define the event listener for download
-            def on_download(download):
-                nonlocal download_triggered
-                download_triggered = True
+                # Define the event listener for download
+                async def on_download(download):
+                    nonlocal download_triggered
+                    download_triggered = True
 
-            page = context.new_page()
-            page.set_extra_http_headers(get_headers)
-            page.on('download', on_download)
-            try:
-                page.goto(url, wait_until="domcontentloaded")
-            except Exception as e:
-                pass
+                page = await context.new_page()
+                await page.set_extra_http_headers(get_headers)
+                page.on('download', on_download)
+                try:
+                    await page.goto(url, wait_until="domcontentloaded")
+                except Exception as e:
+                    pass
 
-            page.close()
-            context.close()
-            browser.close()
-            p.stop()
+                await page.close()
+                await context.close()
+                await browser.close()
         except Exception as e:
             logging.error(f"Error in url_triggers_download for {url}: {e}")
         return download_triggered
 
-    def fetch_page_contents(self, url: str, debug: bool = False) -> Tuple[str, str, List[str]]:
+    async def fetch_page_contents(self, url: str, debug: bool = False) -> Tuple[str, str, List[str]]:
         '''
         Fetch content from a URL with a timeout.
         Args:
@@ -132,29 +131,29 @@ class Indexer(object):
         Returns:
             content, actual url, list of links
         '''
-        page = context = browser = p = None
+        page = context = browser = None
         content = ''
         links = []
         out_url = url
         try:
-            p = sync_playwright().start()
-            browser = p.firefox.launch(headless=True)
-            context = browser.new_context()
-            page = context.new_page()
-            page.set_extra_http_headers(get_headers)
-            page.route("**/*", lambda route: route.abort()  # do not load images as they are unnecessary for our purpose
-                if route.request.resource_type == "image" 
-                else route.continue_() 
-            ) 
-            if debug:
-                page.on('console', lambda msg: logging.info(f"playwright debug: {msg.text})"))
+            async with async_playwright() as p:
+                browser = await p.firefox.launch(headless=True)
+                context = await browser.new_context()
+                page = await context.new_page()
+                await page.set_extra_http_headers(get_headers)
+                await page.route("**/*", lambda route: route.abort()  # do not load images as they are unnecessary for our purpose
+                    if route.request.resource_type == "image" 
+                    else route.continue_() 
+                )
+                if debug:
+                    page.on('console', lambda msg: logging.info(f"playwright debug: {msg.text})"))
 
-            page.goto(url, timeout=self.timeout*1000, wait_until="load")
-            content = page.content()
-            out_url = page.url
-            links_elements = page.query_selector_all("a")
-            links = [link.get_attribute("href") for link in links_elements if link.get_attribute("href")]
-            
+                await page.goto(url, timeout=self.timeout*1000, wait_until="load")
+                content = await page.content()
+                out_url = page.url
+                links_elements = await page.query_selector_all("a")
+                links = [await link.get_attribute("href") for link in links_elements if await link.get_attribute("href")]
+                
         except PlaywrightTimeoutError:
             logging.info(f"Page loading timed out for {url}")
         except Exception as e:
@@ -162,25 +161,20 @@ class Indexer(object):
         finally:
             if page:
                 try:
-                    page.close()
+                    await page.close()
                 except Exception as e:
                     logging.error(f"Error closing page for {url}: {e}")
             if context:
                 try:
-                    context.close()
+                    await context.close()
                 except Exception as e:
                     logging.error(f"Error closing context for {url}: {e}")
             if browser:
                 try:
-                    browser.close()
+                    await browser.close()
                 except Exception as e:
                     logging.error(f"Error closing browser for {url}: {e}")
-            if p:
-                try:
-                    p.stop()
-                except Exception as e:
-                    logging.error(f"Error stopping Playwright for {url}: {e}")
-            
+        
         return content, out_url, links
 
     # delete document; returns True if successful, False otherwise
@@ -210,7 +204,7 @@ class Indexer(object):
             return False
         return True
     
-    def _index_file(self, filename: str, uri: str, metadata: Dict[str, Any]) -> bool:
+    async def _index_file(self, filename: str, uri: str, metadata: Dict[str, Any]) -> bool:
         """
         Index a file on local file system by uploading it to the Vectara corpus.
         Args:
@@ -259,7 +253,7 @@ class Indexer(object):
         logging.info(f"REST upload for {uri} succeesful")
         return True
 
-    def _index_document(self, document: Dict[str, Any]) -> bool:
+    async def _index_document(self, document: Dict[str, Any]) -> bool:
         """
         Index a document (by uploading it to the Vectara corpus) from the document dictionary
         """
@@ -313,7 +307,7 @@ class Indexer(object):
         logging.info(f"Indexing document {document['documentId']} failed, response = {result}")
         return False
     
-    def index_url(self, url: str, metadata: Dict[str, Any]) -> bool:
+    async def index_url(self, url: str, metadata: Dict[str, Any]) -> bool:
         """
         Index a url by rendering it with scrapy-playwright, extracting paragraphs, then uploading to the Vectara corpus.
         Args:
@@ -325,7 +319,7 @@ class Indexer(object):
         st = time.time()
         url = url.split("#")[0]     # remove fragment, if exists
 
-        if self.url_triggers_download(url):
+        if await self.url_triggers_download(url):
             file_path = 'tmpfile'
             response = self.session.get(url, stream=True)
             if response.status_code == 200:
@@ -338,21 +332,10 @@ class Indexer(object):
                 return False
             # parse downloaded file
             try:
-                content, actual_url, _ = self.fetch_page_contents(url)
+                title, texts = await _parse_local_file(file_path, summarize_tables=self.summarize_tables, openai_api_key=self.cfg.vectara.get("openai_api_key", None))
             except Exception as e:
-                import traceback
-                logging.info(f"Failed to crawl {url}, skipping due to error {e}, traceback={traceback.format_exc()}")
-                if "Target page, context or browser has been closed" in str(e):
-                    logging.info("Attempting to reinitialize the browser and retry indexing...")
-                    self.reinitialize_browser()
-                    try:
-                        content, actual_url, _ = self.fetch_page_contents(url)
-                        # ... (existing code remains the same)
-                    except Exception as e:
-                        logging.info(f"Failed to crawl {url} after browser reinitialization, skipping due to error {e}, traceback={traceback.format_exc()}")
-                        return False
-                else:
-                    return False
+                logging.info(f"Failed to crawl {url} - extracting content from file failed, with error {e}, skipping...")
+                return False
 
         else:
             # If MD, RST of IPYNB file, then we don't need playwright - can just download content directly and convert to text
@@ -374,7 +357,7 @@ class Indexer(object):
 
             else:
                 try:
-                    content, actual_url, _ = self.fetch_page_contents(url)
+                    content, actual_url, _ = await self.fetch_page_contents(url)
                     if content is None or len(content)<3:
                         return False
                     if self.detected_language is None:
@@ -397,11 +380,11 @@ class Indexer(object):
                     return False
         
         doc_id = slugify(url)
-        succeeded = self.index_segments(doc_id=doc_id, texts=parts,
+        succeeded = await self.index_segments(doc_id=doc_id, texts=parts,
                                         doc_metadata=metadata, doc_title=extracted_title)
         return succeeded
 
-    def index_segments(self, doc_id: str, texts: List[str], titles: Optional[List[str]] = None, metadatas: Optional[List[Dict[str, Any]]] = None, 
+    async def index_segments(self, doc_id: str, texts: List[str], titles: Optional[List[str]] = None, metadatas: Optional[List[Dict[str, Any]]] = None, 
                        doc_metadata: Dict[str, Any] = {}, doc_title: str = "") -> bool:
         """
         Index a document (by uploading it to the Vectara corpus) from the set of segments (parts) that make up the document.
@@ -426,16 +409,16 @@ class Indexer(object):
 
         logging.info(f"Indexing document {doc_id} with {document}")
 
-        return self.index_document(document)
+        return await self.index_document(document)
 
-    def index_document(self, document: Dict[str, Any]) -> bool:
+    async def index_document(self, document: Dict[str, Any]) -> bool:
         """
         Index a document (by uploading it to the Vectara corpus).
         Document is a dictionary that includes documentId, title, optionally metadataJson, and section (which is a list of segments).
         """
-        return self._index_document(document)
+        return await self._index_document(document)
 
-    def index_file(self, filename: str, uri: str, metadata: Dict[str, Any]) -> bool:
+    async def index_file(self, filename: str, uri: str, metadata: Dict[str, Any]) -> bool:
         """
         Index a file on local file system by uploading it to the Vectara corpus.
         Args:
@@ -458,11 +441,11 @@ class Indexer(object):
         if (any(filename.endswith(extension) for extension in large_file_extensions) and
             (get_file_size_in_MB(filename) >= 50 or self.summarize_tables)):
             openai_api_key = self.cfg.vectara.get("openai_api_key", None)
-            title, texts = _parse_local_file(filename, summarize_tables=self.summarize_tables, openai_api_key=openai_api_key)
-            succeeded = self.index_segments(doc_id=slugify(filename), texts=texts,
+            title, texts = await _parse_local_file(filename, summarize_tables=self.summarize_tables, openai_api_key=openai_api_key)
+            succeeded = await self.index_segments(doc_id=slugify(filename), texts=texts,
                                             doc_metadata=metadata, doc_title=title)
             logging.info(f"For file {filename}, extracting text locally since file size is larger than 50MB")
             return succeeded
         else:
             # index the file within Vectara (use FILE UPLOAD API)
-            return self._index_file(filename, uri, metadata)
+            return await self._index_file(filename, uri, metadata)

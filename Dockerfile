@@ -22,6 +22,7 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt-get install -y python3-pip
 RUN pip3 install poetry
+
 COPY poetry.lock pyproject.toml $HOME/
 RUN poetry config virtualenvs.create false
 RUN poetry install --only main
@@ -46,5 +47,16 @@ ENV VECTARA_API_KEY=$VECTARA_API_KEY
 ENV VECTARA_CORPUS_ID=$VECTARA_CORPUS_ID
 ENV VECTARA_CUSTOMER_ID=$VECTARA_CUSTOMER_ID
 
+# Log environment variables
+RUN echo "CONFIG_FILE: $CONFIG_FILE"
+RUN echo "PROFILE: $PROFILE"
+RUN echo "VECTARA_API_KEY: ${VECTARA_API_KEY:0:5}..."
+RUN echo "VECTARA_CORPUS_ID: $VECTARA_CORPUS_ID"
+RUN echo "VECTARA_CUSTOMER_ID: $VECTARA_CUSTOMER_ID"
+
+# Add logging statements before the CMD instruction
+RUN echo "Executing ingest.py script..."
+RUN python3 -c "print('Reached the ingest.py script')"
+
 ENTRYPOINT ["/bin/bash", "-l", "-c"]
-CMD ["python3", "ingest.py"]
+CMD ["echo 'Starting ingest.py script...' && python3 ingest.py"]

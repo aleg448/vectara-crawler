@@ -142,7 +142,7 @@ def main() -> None:
     logging.info(f"Starting crawl of type {crawler_type}...")
     crawler.crawl()
     logging.info(f"Finished crawl of type {crawler_type}...")
-
+#test
 if __name__ == '__main__':
     root = logging.getLogger()
     root.setLevel(logging.INFO)

@@ -87,7 +87,8 @@ def main() -> None:
         return
     
     # process arguments 
-    cfg: DictConfig = DictConfig(OmegaConf.load(config_name))
+    config_path = os.path.join('/home/vectara/config', config_name)
+    cfg: DictConfig = DictConfig(OmegaConf.load(config_path))
     
     logging.info("Loaded configuration")
 
@@ -142,7 +143,7 @@ def main() -> None:
     logging.info(f"Starting crawl of type {crawler_type}...")
     crawler.crawl()
     logging.info(f"Finished crawl of type {crawler_type}...")
-#test
+
 if __name__ == '__main__':
     root = logging.getLogger()
     root.setLevel(logging.INFO)

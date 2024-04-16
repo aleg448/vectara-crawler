@@ -87,7 +87,7 @@ def main() -> None:
         return
     
     # process arguments 
-    config_path = os.path.join('/home/vectara/config', config_name)
+    config_path = os.path.join('/home/vectara', config_name)
     cfg: DictConfig = DictConfig(OmegaConf.load(config_path))
     
     logging.info("Loaded configuration")

@@ -15,9 +15,9 @@ if [ ! -f "$CONFIG_FILE" ]; then
     exit 3
 fi
 
-# Mount config file into docker container
+# Mount config directory into docker container
 mkdir -p ~/tmp/mount/config
-cp $CONFIG_FILE ~/tmp/mount/config/
+cp -r config ~/tmp/mount/
 
 config_file_name="${CONFIG_FILE##*/}"
 
@@ -69,17 +69,17 @@ if [[ "${crawler_type}" == "folder" ]]; then
     # Special handling of "folder crawler" where we need to mount the folder under /home/vectara/data
     folder=`python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG_FILE'))['folder_crawler']['path'])"`
     echo $folder
-    docker run -d -v "$folder:/home/vectara/data" -e CONFIG=/home/vectara/env/$config_file_name -e PROFILE=$PROFILE -e VECTARA_API_KEY=$VECTARA_API_KEY -e VECTARA_CORPUS_ID=$VECTARA_CORPUS_ID -e VECTARA_CUSTOMER_ID=$VECTARA_CUSTOMER_ID --name vingest $tag
+    docker run -d -v "$folder:/home/vectara/data" -v ~/tmp/mount/config:/home/vectara/config -e CONFIG=/home/vectara/config/$config_file_name -e PROFILE=$PROFILE -e VECTARA_API_KEY=$VECTARA_API_KEY -e VECTARA_CORPUS_ID=$VECTARA_CORPUS_ID -e VECTARA_CUSTOMER_ID=$VECTARA_CUSTOMER_ID --name vingest $tag
 elif [[ "$crawler_type" == "csv" ]]; then
     # Special handling of "csv crawler" where we need to mount the csv file under /home/vectara/data
     csv_path=`python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG_FILE'))['csv_crawler']['csv_path'])"`
-    docker run -d -v "$csv_path:/home/vectara/data/file.csv" -e CONFIG=/home/vectara/env/$config_file_name -e PROFILE=$PROFILE -e VECTARA_API_KEY=$VECTARA_API_KEY -e VECTARA_CORPUS_ID=$VECTARA_CORPUS_ID -e VECTARA_CUSTOMER_ID=$VECTARA_CUSTOMER_ID --name vingest $tag
+    docker run -d -v "$csv_path:/home/vectara/data/file.csv" -v ~/tmp/mount/config:/home/vectara/config -e CONFIG=/home/vectara/config/$config_file_name -e PROFILE=$PROFILE -e VECTARA_API_KEY=$VECTARA_API_KEY -e VECTARA_CORPUS_ID=$VECTARA_CORPUS_ID -e VECTARA_CUSTOMER_ID=$VECTARA_CUSTOMER_ID --name vingest $tag
 elif [[ "$crawler_type" == "bulkupload" ]]; then
     # Special handling of "bulkupload crawler" where we need to mount the JSON file under /home/vectara/data
     json_path=`python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG_FILE'))['bulkupload_crawler']['json_path'])"`
-    docker run -d -v "$json_path:/home/vectara/data/file.json" -e CONFIG=/home/vectara/env/$config_file_name -e PROFILE=$PROFILE -e VECTARA_API_KEY=$VECTARA_API_KEY -e VECTARA_CORPUS_ID=$VECTARA_CORPUS_ID -e VECTARA_CUSTOMER_ID=$VECTARA_CUSTOMER_ID --name vingest $tag
+    docker run -d -v "$json_path:/home/vectara/data/file.json" -v ~/tmp/mount/config:/home/vectara/config -e CONFIG=/home/vectara/config/$config_file_name -e PROFILE=$PROFILE -e VECTARA_API_KEY=$VECTARA_API_KEY -e VECTARA_CORPUS_ID=$VECTARA_CORPUS_ID -e VECTARA_CUSTOMER_ID=$VECTARA_CUSTOMER_ID --name vingest $tag
 else
-    docker run -d -e CONFIG=/home/vectara/env/$config_file_name -e PROFILE=$PROFILE -e VECTARA_API_KEY=$VECTARA_API_KEY -e VECTARA_CORPUS_ID=$VECTARA_CORPUS_ID -e VECTARA_CUSTOMER_ID=$VECTARA_CUSTOMER_ID --name vingest $tag
+    docker run -d -v ~/tmp/mount/config:/home/vectara/config -e CONFIG=/home/vectara/config/$config_file_name -e PROFILE=$PROFILE -e VECTARA_API_KEY=$VECTARA_API_KEY -e VECTARA_CORPUS_ID=$VECTARA_CORPUS_ID -e VECTARA_CUSTOMER_ID=$VECTARA_CUSTOMER_ID --name vingest $tag
 fi
 
 if [ $? -eq 0 ]; then

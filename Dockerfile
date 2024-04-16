@@ -39,7 +39,7 @@ RUN if [ "$INSTALL_EXTRA" = "true" ]; then \
 COPY *.py $HOME/
 COPY core/*.py $HOME/core/
 COPY crawlers/ $HOME/crawlers/
-COPY config/ $HOME/config/  # Copy the config directory into the container
+COPY config/ $HOME/config/
 
 # Set environment variables
 ENV CONFIG_FILE=$CONFIG_FILE

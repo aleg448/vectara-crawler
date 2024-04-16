@@ -105,23 +105,26 @@ class Indexer(object):
 
     def url_triggers_download(self, url: str) -> bool:
         download_triggered = False
-        context = self.browser.new_context()
-
-        # Define the event listener for download
-        def on_download(download):
-            nonlocal download_triggered
-            download_triggered = True
-
-        page = context.new_page()
-        page.set_extra_http_headers(get_headers)
-        page.on('download', on_download)
         try:
-            page.goto(url, wait_until="domcontentloaded")
-        except Exception as e:
-            pass
+            context = self.browser.new_context()
+ 
+            # Define the event listener for download
+            def on_download(download):
+                nonlocal download_triggered
+                download_triggered = True
 
-        page.close()
-        context.close()
+            page = context.new_page()
+            page.set_extra_http_headers(get_headers)
+            page.on('download', on_download)
+            try:
+                page.goto(url, wait_until="domcontentloaded")
+            except Exception as e:
+                pass
+
+            page.close()
+            context.close()
+        except Exception as e:
+            logging.error(f"Error in url_triggers_download for {url}: {e}")
         return download_triggered
 
     def fetch_page_contents(self, url: str, debug: bool = False) -> Tuple[str, str, List[str]]:
@@ -162,9 +165,15 @@ class Indexer(object):
                 self.browser = self.p.firefox.launch(headless=True)
         finally:
             if page:
-                page.close()
+                try:
+                    page.close()
+                except Exception as e:
+                    logging.error(f"Error closing page for {url}: {e}")
             if context:
-                context.close()
+                try:
+                    context.close()
+                except Exception as e:
+                    logging.error(f"Error closing context for {url}: {e}")
             
         return content, out_url, links
 

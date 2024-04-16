@@ -86,12 +86,8 @@ def main() -> None:
         logging.error("PROFILE environment variable not set")
         return
     
-    # Determine the correct path to the configuration file
-    current_dir = os.getcwd()
-    config_path = os.path.join(current_dir, config_name)
-    
     # Process arguments
-    cfg: DictConfig = DictConfig(OmegaConf.load(config_path))
+    cfg: DictConfig = DictConfig(OmegaConf.load(config_name))
     
     logging.info("Loaded configuration")
 

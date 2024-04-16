@@ -91,6 +91,9 @@ class Crawler(object):
         reindex = self.cfg.vectara.get("reindex", False)
         self.indexer = Indexer(cfg, endpoint, customer_id, corpus_id, api_key, reindex)
 
+    def setup(self):
+        pass
+
     def url_to_file(self, url: str, title: str) -> str:
         """
         Crawl a single webpage and create a PDF file to reflect its rendered content.

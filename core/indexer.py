@@ -90,8 +90,6 @@ class Indexer(object):
                 logging.info("OpenAI API key not found, disabling table summarization")
             self.summarize_tables = False
 
-        self.setup()
-
     def mask_pii(self, text: str) -> str:
         if self.cfg.vectara.get("mask_pii", False):
             return mask_pii(text)

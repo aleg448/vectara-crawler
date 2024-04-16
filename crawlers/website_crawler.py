@@ -101,8 +101,8 @@ class WebsiteCrawler(Crawler):
             elif self.cfg.website_crawler.pages_source == "crawl":
                 max_depth = self.cfg.website_crawler.get("max_depth", 3)
                 urls_set = recursive_crawl(homepage, max_depth, 
-                                           pos_regex=self.pos_regex, neg_regex=self.neg_regex, 
-                                           indexer=self.indexer)
+                                        pos_regex=self.pos_regex, neg_regex=self.neg_regex, 
+                                        indexer=self.indexer)
                 urls = clean_urls(urls_set)
                 urls = list(set(urls_set))
             else:
@@ -137,11 +137,8 @@ class WebsiteCrawler(Crawler):
 
         if ray_workers > 0:
             logging.info(f"Using {ray_workers} ray workers")
-            self.indexer.p = self.indexer.browser = None
             ray.init(num_cpus=ray_workers, log_to_driver=True, include_dashboard=False)
             actors = [ray.remote(PageCrawlWorker).remote(self.indexer, self) for _ in range(ray_workers)]
-            for a in actors:
-                a.setup.remote()
             pool = ray.util.ActorPool(actors)
             _ = list(pool.map(lambda a, u: a.process.remote(u, extraction=extraction, delay=delay, source=source), urls))
                 

@@ -97,17 +97,13 @@ class Indexer(object):
             return mask_pii(text)
         return text
 
-    def setup(self):
-        self.session = create_session_with_retries()
-        # Create playwright browser so we can reuse it across all Indexer operations
-        self.p = sync_playwright().start()
-        self.browser = self.p.firefox.launch(headless=True)
-
     def url_triggers_download(self, url: str) -> bool:
         download_triggered = False
         try:
-            context = self.browser.new_context()
- 
+            p = sync_playwright().start()
+            browser = p.firefox.launch(headless=True)
+            context = browser.new_context()
+
             # Define the event listener for download
             def on_download(download):
                 nonlocal download_triggered
@@ -123,6 +119,8 @@ class Indexer(object):
 
             page.close()
             context.close()
+            browser.close()
+            p.stop()
         except Exception as e:
             logging.error(f"Error in url_triggers_download for {url}: {e}")
         return download_triggered
@@ -136,12 +134,14 @@ class Indexer(object):
         Returns:
             content, actual url, list of links
         '''
-        page = context = None
+        page = context = browser = p = None
         content = ''
         links = []
         out_url = url
         try:
-            context = self.browser.new_context()
+            p = sync_playwright().start()
+            browser = p.firefox.launch(headless=True)
+            context = browser.new_context()
             page = context.new_page()
             page.set_extra_http_headers(get_headers)
             page.route("**/*", lambda route: route.abort()  # do not load images as they are unnecessary for our purpose
@@ -161,8 +161,6 @@ class Indexer(object):
             logging.info(f"Page loading timed out for {url}")
         except Exception as e:
             logging.info(f"Page loading failed for {url} with exception '{e}'")
-            if not self.browser.is_connected():
-                self.browser = self.p.firefox.launch(headless=True)
         finally:
             if page:
                 try:
@@ -174,6 +172,16 @@ class Indexer(object):
                     context.close()
                 except Exception as e:
                     logging.error(f"Error closing context for {url}: {e}")
+            if browser:
+                try:
+                    browser.close()
+                except Exception as e:
+                    logging.error(f"Error closing browser for {url}: {e}")
+            if p:
+                try:
+                    p.stop()
+                except Exception as e:
+                    logging.error(f"Error stopping Playwright for {url}: {e}")
             
         return content, out_url, links
 
@@ -460,10 +468,3 @@ class Indexer(object):
         else:
             # index the file within Vectara (use FILE UPLOAD API)
             return self._index_file(filename, uri, metadata)
-    def reinitialize_browser(self):
-        if self.browser and self.browser.is_connected():
-            self.browser.close()
-        if self.p:
-            self.p.stop()
-        self.p = sync_playwright().start()
-        self.browser = self.p.firefox.launch(headless=True)

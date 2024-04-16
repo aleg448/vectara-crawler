@@ -63,7 +63,7 @@ if [[ "${crawler_type}" == "folder" ]]; then
     # Special handling of "folder crawler" where we need to mount the folder under /home/vectara/data
     folder=`python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG_FILE'))['folder_crawler']['path'])"`
     echo $folder
-    docker run -d -v "$folder:/home/vectara/data" -v $(pwd):/home/vectara/app -e CONFIG=/home/vectara/app/$CONFIG_FILE -e PROFILE=$PROFILE -e VECTARA_API_KEY=$VECTARA_API_KEY -e VECTARA_CORPUS_ID=$VECTARA_CORPUS_ID -e VECTARA_CUSTOMER_ID=$VECTARA_CUSTOMER_ID --name vingest $tag
+    docker run -d -v $(pwd):/home/vectara/app -e CONFIG=/home/vectara/app/config/website-test.yaml -e PROFILE=$PROFILE -e VECTARA_API_KEY=$VECTARA_API_KEY -e VECTARA_CORPUS_ID=$VECTARA_CORPUS_ID -e VECTARA_CUSTOMER_ID=$VECTARA_CUSTOMER_ID --name vingest $tag
 elif [[ "$crawler_type" == "csv" ]]; then
     # Special handling of "csv crawler" where we need to mount the csv file under /home/vectara/data
     csv_path=`python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG_FILE'))['csv_crawler']['csv_path'])"`

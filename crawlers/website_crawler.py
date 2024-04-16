@@ -66,7 +66,24 @@ class PageCrawlWorker(object):
                 self.logger.error(
                     f"Error while indexing {url}: {e}, traceback={traceback.format_exc()}"
                 )
-                return -1
+                # Check if the error is related to the target page, context or browser being closed
+                if "Target page, context or browser has been closed" in str(e):
+                    self.logger.info("Attempting to reinitialize the indexer and retry indexing...")
+                    self.indexer.setup()  # Reinitialize the indexer
+                    try:
+                        with rate_limiter:
+                            succeeded = self.indexer.index_url(url, metadata=metadata)
+                        if not succeeded:
+                            self.logger.info(f"Indexing failed for {url} after retry")
+                        else:
+                            self.logger.info(f"Indexing {url} was successful after retry")
+                    except Exception as e:
+                        self.logger.error(
+                            f"Error while retrying indexing {url}: {e}, traceback={traceback.format_exc()}"
+                        )
+                        return -1
+                else:
+                    return -1
         return 0
 
 class WebsiteCrawler(Crawler):

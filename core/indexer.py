@@ -323,13 +323,21 @@ class Indexer(object):
                 return False
             # parse downloaded file
             try:
-                elements = partition(file_path)
-                parts = [str(t) for t in elements if type(t)!=us.documents.elements.Title]
-                titles = [str(x) for x in elements if type(x)==us.documents.elements.Title and len(str(x))>20]
-                extracted_title = titles[0] if len(titles)>0 else 'unknown'
+                content, actual_url, _ = self.fetch_page_contents(url)
             except Exception as e:
-                logging.info(f"Failed to crawl {url} - extracting content from file failed, with error {e}, skipping...")
-                return False
+                import traceback
+                logging.info(f"Failed to crawl {url}, skipping due to error {e}, traceback={traceback.format_exc()}")
+                if "Target page, context or browser has been closed" in str(e):
+                    logging.info("Attempting to reinitialize the browser and retry indexing...")
+                    self.reinitialize_browser()
+                    try:
+                        content, actual_url, _ = self.fetch_page_contents(url)
+                        # ... (existing code remains the same)
+                    except Exception as e:
+                        logging.info(f"Failed to crawl {url} after browser reinitialization, skipping due to error {e}, traceback={traceback.format_exc()}")
+                        return False
+                else:
+                    return False
 
         else:
             # If MD, RST of IPYNB file, then we don't need playwright - can just download content directly and convert to text
@@ -443,4 +451,10 @@ class Indexer(object):
         else:
             # index the file within Vectara (use FILE UPLOAD API)
             return self._index_file(filename, uri, metadata)
-    
+    def reinitialize_browser(self):
+        if self.browser and self.browser.is_connected():
+            self.browser.close()
+        if self.p:
+            self.p.stop()
+        self.p = sync_playwright().start()
+        self.browser = self.p.firefox.launch(headless=True)

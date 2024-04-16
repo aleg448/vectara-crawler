@@ -86,9 +86,12 @@ def main() -> None:
         logging.error("PROFILE environment variable not set")
         return
     
-    # process arguments 
-    config_path = os.path.join('/home/vectara', config_name)
-    cfg: DictConfig = DictConfig(OmegaConf.load(config_name))
+    # Determine the correct path to the configuration file
+    current_dir = os.getcwd()
+    config_path = os.path.join(current_dir, config_name)
+    
+    # Process arguments
+    cfg: DictConfig = DictConfig(OmegaConf.load(config_path))
     
     logging.info("Loaded configuration")
 
@@ -127,7 +130,7 @@ def main() -> None:
     logging.info(f"API Key: {api_key[:5]}...")  # Log only the first 5 characters of the API key
     logging.info(f"Crawler Type: {crawler_type}")
 
-    # instantiate the crawler
+    # Instantiate the crawler
     crawler = instantiate_crawler(Crawler, 'crawlers', f'{crawler_type.capitalize()}Crawler', cfg, endpoint, customer_id, corpus_id, api_key)
 
     logging.info(f"Instantiated {crawler_type.capitalize()}Crawler")
@@ -139,7 +142,7 @@ def main() -> None:
     if reset_corpus_flag:
         logging.info("Resetting corpus")
         reset_corpus(endpoint, customer_id, corpus_id, cfg.vectara.auth_url, cfg.vectara.auth_id, cfg.vectara.auth_secret)
-        time.sleep(5)   # wait 5 seconds to allow reset_corpus enough time to complete on the backend
+        time.sleep(5)   # Wait 5 seconds to allow reset_corpus enough time to complete on the backend
     logging.info(f"Starting crawl of type {crawler_type}...")
     crawler.crawl()
     logging.info(f"Finished crawl of type {crawler_type}...")

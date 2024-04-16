@@ -39,24 +39,14 @@ RUN if [ "$INSTALL_EXTRA" = "true" ]; then \
 COPY *.py $HOME/
 COPY core/*.py $HOME/core/
 COPY crawlers/ $HOME/crawlers/
+COPY config/ $HOME/config/  # Copy the config directory into the container
 
 # Set environment variables
-ENV CONFIG_FILE=/home/vectara/env/config.yaml
+ENV CONFIG_FILE=$CONFIG_FILE
 ENV PROFILE=$PROFILE
 ENV VECTARA_API_KEY=$VECTARA_API_KEY
 ENV VECTARA_CORPUS_ID=$VECTARA_CORPUS_ID
 ENV VECTARA_CUSTOMER_ID=$VECTARA_CUSTOMER_ID
-
-# Log environment variables
-RUN echo "CONFIG_FILE: $CONFIG_FILE"
-RUN echo "PROFILE: $PROFILE"
-RUN echo "VECTARA_API_KEY: ${VECTARA_API_KEY:0:5}..."
-RUN echo "VECTARA_CORPUS_ID: $VECTARA_CORPUS_ID"
-RUN echo "VECTARA_CUSTOMER_ID: $VECTARA_CUSTOMER_ID"
-
-# Add logging statements before the CMD instruction
-RUN echo "Executing ingest.py script..."
-RUN python3 -c "print('Reached the ingest.py script')"
 
 ENTRYPOINT ["/bin/bash", "-l", "-c"]
 CMD ["echo 'Starting ingest.py script...' && python3 ingest.py"]

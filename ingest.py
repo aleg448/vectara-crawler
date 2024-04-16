@@ -62,6 +62,7 @@ def reset_corpus(endpoint: str, customer_id: str, corpus_id: int, auth_url: str,
         logging.info(f"Reset corpus {corpus_id}")
     else:
         logging.error(f"Error resetting corpus: {response.status_code} {response.text}")
+                      
 
 def main() -> None:
     """
@@ -85,8 +86,8 @@ def main() -> None:
     if not profile_name:
         logging.error("PROFILE environment variable not set")
         return
-    
-    # Process arguments
+
+    # Process arguments 
     cfg: DictConfig = DictConfig(OmegaConf.load(config_name))
     
     logging.info("Loaded configuration")

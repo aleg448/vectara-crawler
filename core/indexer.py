@@ -416,7 +416,59 @@ class Indexer(object):
         Index a document (by uploading it to the Vectara corpus).
         Document is a dictionary that includes documentId, title, optionally metadataJson, and section (which is a list of segments).
         """
-        return await self._index_document(document)
+        api_endpoint = f"https://{self.endpoint}/v1/index"
+        
+        request = {
+            'customer_id': self.customer_id,
+            'corpus_id': self.corpus_id,
+            'document': document,
+        }
+
+        post_headers = {
+            'x-api-key': self.api_key,
+            'customer-id': str(self.customer_id),
+            'X-Source': self.x_source
+        }
+        
+        try:
+            data = json.dumps(request)
+        except Exception as e:
+            logging.info(f"Can't serialize request {request}, skipping")
+            return False
+
+        try:
+            response = self.session.post(api_endpoint, data=data, verify=True, headers=post_headers)
+            logging.info(f"API response status code: {response.status_code}")
+            logging.info(f"API response text: {response.text}")
+        except Exception as e:
+            logging.info(f"Exception {e} while indexing document {document['documentId']}")
+            return False
+
+        if response.status_code != 200:
+            logging.error("REST upload failed with code %d, reason %s, text %s",
+                        response.status_code,
+                        response.reason,
+                        response.text)
+            return False
+
+        result = response.json()
+        if "status" in result and result["status"] and \
+        ("ALREADY_EXISTS" in result["status"]["code"] or \
+            ("CONFLICT" in result["status"]["code"] and "Indexing doesn't support updating documents" in result["status"]["statusDetail"])):
+            if self.reindex:
+                logging.info(f"Document {document['documentId']} already exists, re-indexing")
+                self.delete_doc(document['documentId'])
+                response = self.session.post(api_endpoint, data=json.dumps(request), verify=True, headers=post_headers)
+                return True
+            else:
+                logging.info(f"Document {document['documentId']} already exists, skipping")
+                return False
+        if "status" in result and result["status"] and "OK" in result["status"]["code"]:
+            return True
+        
+        logging.info(f"Indexing document {document['documentId']} failed, response = {result}")
+        return False
+        
 
     async def index_file(self, filename: str, uri: str, metadata: Dict[str, Any]) -> bool:
         """

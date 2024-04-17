@@ -8,7 +8,7 @@ crawling:
   crawler_type: website
 
 website_crawler:
-  urls: ["https://vectara.com"]
+  urls: ["handbook.gitlab.com/handbook"]
   delay: 1
   pages_source: sitemap
   pos_regex: [".*"]
